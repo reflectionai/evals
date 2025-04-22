@@ -1,0 +1,9 @@
+atlas:
+  id: atlas.dev.v0
+  description: A basic eval that checks if the sampled text matches the ideal output.
+  metrics: [accuracy]
+
+atlas.dev.v0:
+  class: evals.elsuite.basic.match:Match
+  args:
+    samples_jsonl: atlas/samples.jsonl
