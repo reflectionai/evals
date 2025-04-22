@@ -1,10 +1,13 @@
 atlas:
   id: atlas.dev.v0
-  description: A model-graded eval using the closedqa spec.
-  metrics: [accuracy]
+  description: A model-graded eval using pydantic-ai and structured criteria questions.
+  metrics: [average_score] # Or other relevant metrics from the run output
 
 atlas.dev.v0:
-  class: evals.elsuite.modelgraded.classify:ModelBasedClassify
+  class: evals.elsuite.structured_criteria_eval:StructuredCriteriaEval
   args:
-    samples_jsonl: atlas/samples.jsonl
-    modelgraded_spec: closedqa
+    samples_jsonl: atlas/samples.jsonl # Reuse the same data file
+    # --- CRITICAL: Specify the model for the EVALUATOR ---
+    evaluator_model_id: "openai:gpt-3.5-turbo" # Example: Use GPT-3.5 Turbo as the evaluator
+    # Optional: Add other args if needed (e.g., max_tokens for the main model)
+    # max_tokens: 100
