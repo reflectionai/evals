@@ -1,3 +1,4 @@
+import asyncio
 import random
 from typing import Any, Sequence
 
@@ -63,6 +64,16 @@ class StructuredCriteriaEval(evals.Eval):
             retries=self.evaluator_retries,
         )
 
+    async def get_eval_result(self, input: str, completion: str, criterion_question: str) -> bool | None:
+        evaluator_prompt = self._build_evaluator_prompt(original_input=input, completion=completion, criterion_question=criterion_question)
+        try:
+            return (await self.evaluator_agent.run(evaluator_prompt)).output
+        except UnexpectedModelBehavior as e:
+            record_error(f"Pydantic-AI evaluation failed for question '{criterion_question}': {e}")
+
+    async def get_all_eval_results(self, input: str, completion: str, criterion_questions: list[str]) -> list[bool | None]:
+        return await asyncio.gather(*[self.get_eval_result(input=input, completion=completion, criterion_question=question) for question in criterion_questions])
+
     def eval_sample(self, sample: dict[str, Any], rng: random.Random) -> None:
         """Evaluates a single sample."""
         del rng
@@ -73,17 +84,8 @@ class StructuredCriteriaEval(evals.Eval):
         test_completion_result = self.completion_fn(sample["input"])
         completion_text = test_completion_result.get_completions()[0]  # Assuming one completion
 
-        # 2. Evaluate criteria using the pre-initialized agent
-        criteria_results: dict[str, bool | None] = {}
-
-        for question in _sample.criteria_questions:
-            evaluator_prompt = self._build_evaluator_prompt(original_input=_sample.input, completion=completion_text, criterion_question=question)
-            try:
-                eval_result: bool = self.evaluator_agent.run_sync(evaluator_prompt).output
-                criteria_results[question] = eval_result
-            except UnexpectedModelBehavior as e:
-                record_error(f"Pydantic-AI evaluation failed for question '{question}': {e}")
-                return
+        results = asyncio.run(self.get_all_eval_results(input=_sample.input, completion=completion_text, criterion_questions=_sample.criteria_questions))
+        criteria_results = dict(zip(_sample.criteria_questions, results))
 
         # 3. Calculate score and record results for this sample
         num_yes = sum(bool(r) for r in criteria_results.values())
